@@ -17,6 +17,8 @@
 - `get_header(scope, name: str) -> str | None`: first value of header `name` from an ASGI scope (case-insensitive, latin-1), or None.
 - `get_bearer_token(scope) -> str | None`: token of an `Authorization: Bearer <token>` header (scheme case-insensitive), or None.
 - `resolve_project(url_project: str | None, scope) -> str | None`: the project from the URL segment or the `X-A0-Project` header.
+- `project_allowlist_enabled() -> bool`: whether the `mcp_a2a_project_allowlist` setting is exactly `True`.
+- `require_remote_access(project_name: str | None) -> str | None`: return `project_name` if the MCP and A2A servers may reach it, else raise `RequestRejected`.
 - Notable constants/configuration names: `PROJECT_HEADER` (`"X-A0-Project"`).
 
 ## Runtime Contracts
@@ -25,15 +27,16 @@
 - Update this file whenever public functions, classes, persistence behavior, path/security assumptions, side effects, or cross-module contracts change.
 - Auth contract: both servers accept the API token (the `mcp_server_token` setting) either in the URL (`/t-<token>/`) or as `Authorization: Bearer <token>`; the URL form keeps working unchanged. Callers compare tokens only through `token_matches`.
 - Project-routing contract: the project may come from the URL (`/p-<project>/`) or the `X-A0-Project` header. `resolve_project` validates each with `projects.validate_project_name` and raises `RequestRejected(400, ...)` when the URL value is invalid, the header value is invalid, or both are given and differ. A blank header counts as absent. It returns the URL project, else the header project, else None.
+- Project-allowlist contract (`require_remote_access`): with `mcp_a2a_project_allowlist` off (the default) every project, or none, is reachable and the name is returned unchanged. With it on, a missing project is `RequestRejected(400)` (there is no fallback to a default project), a project for which `projects.get_remote_access` returns None (no such project, or an invalid name) is `400`, and a project whose `remote_access` is off is `403`.
 - `RequestRejected.detail` is safe to return to the client; it never contains the token.
 - Never log the token or the raw header value.
-- Observed side-effect areas: none (pure functions over the ASGI scope).
-- Imported dependency areas include: `hmac`, `helpers`.
+- Observed side-effect areas: settings reads (`settings.get_settings`) and project header reads (`projects.get_remote_access`); no writes.
+- Imported dependency areas include: `hmac`, `helpers` (`projects`, `settings`).
 
 ## Key Concepts
 
-- Important called helpers/classes observed in the source: `hmac.compare_digest`, `projects.validate_project_name`.
-- Callers: `DynamicMcpProxy.__call__` in `mcp_server.py` maps `RequestRejected` to a Starlette `HTTPException`; `DynamicA2AProxy.__call__` in `fasta2a_server.py` sends a plain-text response with `status_code`.
+- Important called helpers/classes observed in the source: `hmac.compare_digest`, `projects.validate_project_name`, `projects.get_remote_access`, `settings.get_settings`.
+- Callers: `DynamicMcpProxy.__call__` in `mcp_server.py` maps `RequestRejected` to a Starlette `HTTPException`; `DynamicA2AProxy.__call__` in `fasta2a_server.py` sends a plain-text response with `status_code`. `require_remote_access` is also called again by the MCP tools `send_message` and `finish_chat` and by `AgentZeroWorker.run_task`, before any chat or context is created.
 - Keep request/response, tool, or helper semantics documented here at the same time as source changes.
 
 ## Work Guidance
@@ -47,6 +50,7 @@
 - Run targeted tests for changed helper behavior; run security regressions for auth, filesystem, WebSocket, tunnel, upload, or secret-handling helpers.
 - Related tests:
   - `tests/test_mcp_a2a_header_auth.py`
+  - `tests/test_mcp_a2a_project_allowlist.py`
 
 ## Child DOX Index
 

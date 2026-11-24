@@ -365,9 +365,9 @@ def test_mcp_project_from_header_or_url(mcp):
 
     assert calls == [
         {"path": "/mcp/sse", "root_path": "/mcp", "project": "alpha"},
-        {"path": f"/mcp/t-{TOKEN}/sse", "root_path": f"/mcp/t-{TOKEN}", "project": "beta"},
-        {"path": f"/mcp/t-{TOKEN}/http/", "root_path": f"/mcp/t-{TOKEN}", "project": "gamma"},
-        {"path": "/mcp/messages/", "root_path": "/mcp", "project": "delta"},
+        {"path": f"/mcp/t-{TOKEN}/p-beta/sse", "root_path": f"/mcp/t-{TOKEN}/p-beta", "project": "beta"},
+        {"path": f"/mcp/t-{TOKEN}/p-gamma/http/", "root_path": f"/mcp/t-{TOKEN}/p-gamma", "project": "gamma"},
+        {"path": "/mcp/p-delta/messages/", "root_path": "/mcp/p-delta", "project": "delta"},
     ]
 
 

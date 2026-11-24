@@ -47,6 +47,23 @@
 
           <div class="field">
             <div class="field-label">
+              <div class="field-title">Only allowlisted projects (MCP and A2A)</div>
+              <div class="field-description">
+                When on, every MCP and A2A call must name a project (X-A0-Project header or /p-&lt;project&gt;/ URL segment)
+                whose "Reachable through MCP/A2A" setting is on in the project's edit view; any other call is rejected.
+                When off, any project or none can be reached.
+              </div>
+            </div>
+            <div class="field-control">
+              <label class="toggle">
+                <input type="checkbox" x-model="settings.mcp_a2a_project_allowlist" />
+                <span class="toggler"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="field">
+            <div class="field-label">
               <div class="field-title">Internal tools</div>
               <div class="field-description">
                 Tools exposed by this Agent Zero instance when the internal MCP server is enabled.

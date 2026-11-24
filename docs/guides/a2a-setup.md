@@ -51,6 +51,10 @@ The basic A2A connection URL follows this format:
 http://YOUR_HOST:PORT/a2a/t-YOUR_API_TOKEN
 ```
 
+With the project allowlist on, every request must also name a project that is
+reachable through A2A, in the URL (below) or in the `X-A0-Project` header (see
+Reachable Projects).
+
 ### With Project Context
 
 To connect with a specific project active:
@@ -64,6 +68,26 @@ When a project is specified:
 - The agent has access to project-specific resources and knowledge
 - Enables isolated, project-focused agent collaboration
 
+### Reachable Projects
+
+By default A2A and MCP calls can reach any project, or none. To limit them, turn on
+**Only allowlisted projects (MCP and A2A)** in the MCP server settings
+(`mcp_a2a_project_allowlist`, off by default). Then, in each project that may be
+reached, turn on **Reachable through MCP/A2A** in its edit view (stored as
+`"remote_access": true` in the project's `.a0proj/project.json`; off by default).
+With the allowlist on, every A2A and MCP request must name such a project, in the
+URL or in the `X-A0-Project` header, and is rejected before any chat is created
+otherwise:
+
+- no project: `400`;
+- a project that does not exist: `400`;
+- a project with **Reachable through MCP/A2A** off: `403`.
+
+There is no fallback to a default project. An MCP `send_message` or `finish_chat`
+with a `chat_id` is also refused when that chat belongs to another project (or to
+none). With the allowlist off, only a chat of another named project is refused, as
+before.
+
 ### Token and Project in Headers
 
 URLs often end up in proxy, browser and access logs. Instead of putting the token
@@ -74,13 +98,13 @@ Authorization: Bearer YOUR_API_TOKEN
 X-A0-Project: PROJECT_NAME
 ```
 
-The URL is then just `http://YOUR_HOST:PORT/a2a`. `X-A0-Project` is optional. If a
-request has both a `/p-PROJECT_NAME` segment and an `X-A0-Project` header and they
+The URL is then just `http://YOUR_HOST:PORT/a2a`. `X-A0-Project` names the project
+(optional unless the project allowlist is on, see Reachable Projects). If a request has both a `/p-PROJECT_NAME` segment and an `X-A0-Project` header and they
 differ, it is rejected with `400`. The URL form keeps working.
 
 The MCP server accepts the same headers: use `http://YOUR_HOST:PORT/mcp/sse` or
-`http://YOUR_HOST:PORT/mcp/http/` with `Authorization: Bearer YOUR_API_TOKEN` (and
-optionally `X-A0-Project`) instead of `/mcp/t-YOUR_API_TOKEN/...`.
+`http://YOUR_HOST:PORT/mcp/http/` with `Authorization: Bearer YOUR_API_TOKEN` and
+`X-A0-Project: PROJECT_NAME` instead of `/mcp/t-YOUR_API_TOKEN/...`.
 
 ## Example Use Cases
 
@@ -129,7 +153,7 @@ If running Agent Zero in Docker:
 You can test A2A connectivity using curl:
 
 ```bash
-curl -X POST http://localhost:8080/a2a/t-YOUR_TOKEN \
+curl -X POST http://localhost:8080/a2a/t-YOUR_TOKEN/p-PROJECT_NAME \
   -H "Content-Type: application/json" \
   -d '{"message": "Hello from another agent"}'
 ```
@@ -139,6 +163,7 @@ Or with the token in a header:
 ```bash
 curl -X POST http://localhost:8080/a2a \
   -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "X-A0-Project: PROJECT_NAME" \
   -H "Content-Type: application/json" \
   -d '{"message": "Hello from another agent"}'
 ```

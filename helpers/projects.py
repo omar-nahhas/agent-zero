@@ -43,6 +43,7 @@ class BasicProjectData(TypedDict):
     description: str
     instructions: str
     include_agents_md: NotRequired[bool]
+    remote_access: NotRequired[bool]
     mcp_servers: NotRequired[str]
     color: str
     git_url: str
@@ -143,6 +144,10 @@ def clone_git_project(name: str, git_url: str, git_token: str, data: BasicProjec
             cloned_header["title"] = data.get("title") or cloned_header.get("title", "")
             cloned_header["color"] = data.get("color") or cloned_header.get("color", "")
             cloned_header["git_url"] = clean_url
+            # A cloned repository never opens itself to the MCP/A2A servers
+            cloned_header["remote_access"] = _normalize_remote_access(
+                data.get("remote_access", False)
+            )
             save_project_header(actual_name, cloned_header)
         else:
             # New project: create meta folders and save header
@@ -196,6 +201,7 @@ def _normalizeBasicData(data: BasicProjectData) -> BasicProjectData:
         "include_agents_md": _normalize_include_agents_md(
             data.get("include_agents_md", True)
         ),
+        "remote_access": _normalize_remote_access(data.get("remote_access", False)),
         "color": data.get("color", ""),
         "git_url": data.get("git_url", ""),
         "file_structure": data.get(
@@ -214,6 +220,7 @@ def _normalizeEditData(data: EditProjectData) -> EditProjectData:
         "include_agents_md": _normalize_include_agents_md(
             data.get("include_agents_md", True)
         ),
+        "remote_access": _normalize_remote_access(data.get("remote_access", False)),
         "variables": data.get("variables", ""),
         "mcp_servers": data.get("mcp_servers", DEFAULT_MCP_SERVERS_CONFIG),
         "color": data.get("color", ""),
@@ -658,12 +665,46 @@ def _normalize_include_agents_md(value: object) -> bool:
     return bool(value)
 
 
+def _normalize_remote_access(value: object) -> bool:
+    # Off unless explicitly turned on: a missing or unreadable value keeps the
+    # project unreachable through the MCP and A2A servers.
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return False
+
+
 def _project_header_for_save(data: BasicProjectData) -> dict:
     header = dict(data)
     header["include_agents_md"] = _normalize_include_agents_md(
         header.get("include_agents_md", True)
     )
+    header["remote_access"] = _normalize_remote_access(
+        header.get("remote_access", False)
+    )
     return header
+
+
+def get_remote_access(name: str | None) -> bool | None:
+    """Whether the MCP and A2A servers may reach project ``name``.
+
+    Returns None when there is no such project, False when it exists but its
+    "Reachable through MCP/A2A" setting (``remote_access``) is off or unreadable.
+    """
+    try:
+        project_name = validate_project_name(name)
+    except ValueError:
+        return None
+    header = files.get_abs_path(
+        PROJECTS_PARENT_DIR, project_name, PROJECT_META_DIR, PROJECT_HEADER_FILE
+    )
+    if not os.path.isfile(header):
+        return None
+    try:
+        return load_basic_project_data(project_name)["remote_access"] is True
+    except Exception:
+        return False
 
 
 def get_context_project_name(context: "AgentContext") -> str | None:

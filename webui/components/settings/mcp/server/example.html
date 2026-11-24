@@ -20,6 +20,8 @@
                         This same token is also used for external API endpoints. The token changes when you update your credentials.
                         Instead of putting it in the URL, a client can send it as an <code>Authorization: Bearer &lt;token&gt;</code> header
                         and use <code>/mcp/sse</code> or <code>/mcp/http/</code>; the project can go in an <code>X-A0-Project</code> header.
+                        With <strong>Only allowlisted projects</strong> on, every call must name a project whose
+                        <strong>Reachable through MCP/A2A</strong> setting is on (project edit view); calls without one, or for any other project, are rejected.
                     </p>
                     <div style="margin-top: 8px;">
                         <label style="display: block; margin-bottom: 4px; color: var(--color-text-secondary); font-size: 12px; font-weight: 600;">Token:</label>

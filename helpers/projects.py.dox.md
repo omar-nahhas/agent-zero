@@ -57,6 +57,8 @@
 - `get_project_agents_md_instruction_file(name: str) -> tuple[str, str] | None`
 - `_format_project_instruction_files(instruction_files: list[tuple[str, str]]) -> str`
 - `_normalize_include_agents_md(value: object) -> bool`
+- `_normalize_remote_access(value: object) -> bool`
+- `get_remote_access(name: str | None) -> bool | None`: whether the MCP and A2A servers may reach the project; None when there is no such project.
 - `load_project_subagents(name: str) -> dict[str, SubAgentSettings]`
 - `save_project_subagents(name: str, subagents_data: dict[str, SubAgentSettings])`
 - `set_project_subagent_enabled(name: str, profile_id: str, enabled: bool) -> None`
@@ -75,6 +77,8 @@
 - Project metadata setup creates and repairs `.a0proj/instructions`, `.a0proj/knowledge`, and `.a0proj/skills` so settings surfaces can open those folders consistently.
 - AGENTS.md discovery is a linear root-to-target chain walk with `AGENTS.override.md` precedence; sibling directories are not scanned.
 - Active-project AGENTS.md protocol guidance excludes the exact project root AGENTS.md because `build_system_prompt_vars(...)` already loads it into project instructions; prose for that protocol block lives in `prompts/agent.protocol.projects.agents_md.md`.
+- `remote_access` ("Reachable through MCP/A2A" in the project edit view) is stored in `.a0proj/project.json` and is off unless explicitly turned on: `_normalize_remote_access` keeps a bool, maps the strings `1/true/yes/on` to True, and anything else (missing, None, numbers, other strings) to False. Create, update and save normalize it; a cloned repository's header is always saved with the value from the request (default False), never with one from the repository.
+- `get_remote_access(name)` returns None for an invalid name (`validate_project_name` fails) or when `.a0proj/project.json` does not exist, False when the header is unreadable or `remote_access` is not True, and True otherwise. `server_auth.require_remote_access` uses it for the MCP/A2A project allowlist.
 - Project MCP config uses the same JSON string shape as global MCP settings: an object with `mcpServers`.
 - Project MCP load/save paths validate project names as simple folder basenames before touching `.a0proj/mcp_servers.json`.
 - Activating or deactivating a project preserves the active chat profile when it
@@ -114,6 +118,7 @@
 
 - Run targeted tests for changed helper behavior; run security regressions for auth, filesystem, WebSocket, tunnel, upload, or secret-handling helpers.
 - Related tests observed by source search:
+  - `tests/test_mcp_a2a_project_allowlist.py`
   - `tests/test_model_config_project_presets.py`
   - `tests/test_office_document_store.py`
   - `tests/test_plugin_activation_ui.py`

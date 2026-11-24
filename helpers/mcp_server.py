@@ -143,6 +143,14 @@ async def send_message(
     # Get project name from context variable (set in proxy __call__)
     project_name = _mcp_project_name.get()
 
+    # With the project allowlist on, the proxy already rejected the request
+    # unless its project is reachable through MCP; check again here, before any
+    # chat is created or continued.
+    try:
+        server_auth.require_remote_access(project_name)
+    except server_auth.RequestRejected as e:
+        return ToolError(error=e.detail, chat_id="")
+
     context: AgentContext | None = None
     if chat_id:
         context = AgentContext.get(chat_id)
@@ -154,14 +162,10 @@ async def send_message(
             # If we continue a conversation, it must be persistent
             persistent_chat = True
 
-            # Validation: if the request names a project but context has different project
-            if project_name:
-                existing_project = context.get_data(projects.CONTEXT_DATA_KEY_PROJECT)
-                if existing_project and existing_project != project_name:
-                    return ToolError(
-                        error=f"Chat belongs to project '{existing_project}' but the request specifies '{project_name}'",
-                        chat_id=chat_id
-                    )
+            # A chat can only be continued from its own project
+            error = _chat_project_error(context, project_name)
+            if error:
+                return ToolError(error=error, chat_id=chat_id)
     else:
         config = initialize_agent()
         context = AgentContext(config=config, type=AgentContextType.BACKGROUND)
@@ -240,14 +244,39 @@ async def finish_chat(
     if not chat_id:
         return ToolError(error="Chat ID is required", chat_id="")
 
+    project_name = _mcp_project_name.get()
+    try:
+        server_auth.require_remote_access(project_name)
+    except server_auth.RequestRejected as e:
+        return ToolError(error=e.detail, chat_id="")
+
     context = AgentContext.get(chat_id)
     if not context:
         return ToolError(error="Chat not found", chat_id=chat_id)
+    error = _chat_project_error(context, project_name)
+    if error:
+        return ToolError(error=error, chat_id=chat_id)
     else:
         context.reset()
         AgentContext.remove(context.id)
         remove_chat(context.id)
         return ToolResponse(response="Chat finished", chat_id=chat_id)
+
+
+def _chat_project_error(context: AgentContext, project_name: str | None) -> str | None:
+    """An error message if the chat does not belong to the request's project.
+
+    With the project allowlist on, the chat's project must be exactly the
+    request's; otherwise only a chat of another named project is refused.
+    """
+    existing_project = context.get_data(projects.CONTEXT_DATA_KEY_PROJECT)
+    if server_auth.project_allowlist_enabled():
+        mismatch = existing_project != project_name
+    else:
+        mismatch = bool(project_name and existing_project and existing_project != project_name)
+    if mismatch:
+        return f"Chat belongs to project '{existing_project or ''}' but the request specifies '{project_name}'"
+    return None
 
 
 async def _run_chat(
@@ -458,9 +487,11 @@ class DynamicMcpProxy:
         if not authorized:
             raise StarletteHTTPException(status_code=403, detail="MCP forbidden")
 
-        # Project from the path (/p-{project}/) or the X-A0-Project header
+        # Project from the path (/p-{project}/) or the X-A0-Project header; with the
+        # project allowlist on it must be reachable through MCP (no default fallback)
         try:
             project_name = server_auth.resolve_project(route.group("project"), scope)
+            server_auth.require_remote_access(project_name)
         except server_auth.RequestRejected as e:
             raise StarletteHTTPException(status_code=e.status_code, detail=e.detail)
         if project_name:
@@ -469,10 +500,16 @@ class DynamicMcpProxy:
         # Store project in context variable (will be available in send_message)
         _mcp_project_name.set(project_name)
 
-        # Drop the /p-{project} segment; keep a URL token in root_path so the
-        # SSE transport announces /t-{token}/messages/ to URL-token clients and
-        # a token-free /messages/ to header clients.
-        prefix = root_path + (f"/t-{url_token}" if url_token is not None else "")
+        # Keep the URL token and URL project in root_path so the SSE transport
+        # announces /t-{token}/p-{project}/messages/ to URL clients (with the project
+        # allowlist on, every request must name the project) and a bare
+        # /messages/ to header clients.
+        url_project = route.group("project")
+        prefix = (
+            root_path
+            + (f"/t-{url_token}" if url_token is not None else "")
+            + (f"/p-{url_project}" if url_project is not None else "")
+        )
         endpoint = route.group("endpoint")
         modified_scope = dict(scope)
         modified_scope["root_path"] = prefix

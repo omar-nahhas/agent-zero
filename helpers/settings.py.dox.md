@@ -80,6 +80,7 @@
   restore their parent even on failure. Each scope clears its cache on exit so
   inherited task contexts cannot retain or repopulate an expired version; reads
   outside an active scope resolve the version afresh.
+- `mcp_a2a_project_allowlist` (default False, "Only allowlisted projects (MCP and A2A)" in the MCP server settings) turns on the MCP/A2A project allowlist enforced by `server_auth.require_remote_access`; it is read per request, so changing it needs no server reconfiguration.
 - Applying settings starts a deferred `MCPConfig.update(...)` with the current `mcp_servers` string when global MCP server settings change.
 - `get_settings()` retains normalize-on-read behavior. Prompt-building callers
   explicitly use `get_settings_for_prompt()` to reuse one task-local snapshot
@@ -108,6 +109,7 @@
   - `tests/test_settings_cache.py`
   - `tests/test_settings_api_keys.py`
   - `tests/test_settings_mcp.py`
+  - `tests/test_mcp_a2a_project_allowlist.py`
   - `tests/test_browser_agent_regressions.py`
   - `tests/test_document_query_plugin.py`
   - `tests/test_download_toast_regressions.py`

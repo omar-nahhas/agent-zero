@@ -8,11 +8,18 @@ access logs, so clients may instead send:
 * ``X-A0-Project: <project>`` - the same project name as in the URL.
 
 The URL form keeps working unchanged. Never log the token or the header value.
+
+With the ``mcp_a2a_project_allowlist`` setting on (off by default), only projects
+whose "Reachable through MCP/A2A" setting is on (``remote_access`` in the
+project's ``.a0proj/project.json``, off by default) can be reached: every MCP and
+A2A request must name such a project, or it is rejected before any chat is
+created (see ``require_remote_access``). With it off, any project or none is
+reachable, as before.
 """
 
 import hmac
 
-from helpers import projects
+from helpers import projects, settings
 
 PROJECT_HEADER = "X-A0-Project"
 
@@ -78,3 +85,36 @@ def resolve_project(url_project: str | None, scope) -> str | None:
             400, f"Project in URL and {PROJECT_HEADER} header differ"
         )
     return url_project or header_project
+
+
+def project_allowlist_enabled() -> bool:
+    """Whether the mcp_a2a_project_allowlist setting is on."""
+    return settings.get_settings().get("mcp_a2a_project_allowlist") is True
+
+
+def require_remote_access(project_name: str | None) -> str | None:
+    """Return ``project_name`` if the MCP and A2A servers may reach it.
+
+    With the ``mcp_a2a_project_allowlist`` setting off, every project (or none)
+    is reachable and ``project_name`` is returned unchanged. With it on, raises
+    RequestRejected:
+
+    * 400 when no project is given (there is no fallback to a default project);
+    * 400 when there is no such project;
+    * 403 when the project's "Reachable through MCP/A2A" setting is off.
+    """
+    if not project_allowlist_enabled():
+        return project_name
+    if not project_name:
+        raise RequestRejected(
+            400,
+            f"A project is required: send the {PROJECT_HEADER} header or a /p-<project>/ URL segment",
+        )
+    allowed = projects.get_remote_access(project_name)
+    if allowed is None:
+        raise RequestRejected(400, f"Unknown project '{project_name}'")
+    if not allowed:
+        raise RequestRejected(
+            403, f"Project '{project_name}' is not reachable through MCP/A2A"
+        )
+    return project_name

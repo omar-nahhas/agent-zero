@@ -59,6 +59,20 @@
                     </div>
                 </div>
 
+                <div class="projects-form-group">
+                    <label class="projects-form-label">Reachable through MCP/A2A</label>
+                    <div class="projects-toggle-row">
+                        <span class="projects-form-description">When turned on, clients of Agent Zero's MCP and A2A
+                            servers can start chats in this project (they name it with the X-A0-Project header or a
+                            /p-&lt;project&gt;/ URL segment). Only applies when the global setting "Only allowlisted projects
+                            (MCP and A2A)" is on (Settings, MCP server); then calls for any project with this off are rejected.</span>
+                        <label class="toggle">
+                            <input type="checkbox" x-model="$store.projects.selectedProject.remote_access">
+                            <span class="toggler"></span>
+                        </label>
+                    </div>
+                </div>
+
                 <!-- Git Status Section -->
                 <template x-if="!$store.projects.selectedProject._meta.creating && $store.projects.selectedProject.git_status?.is_git_repo">
                     <div class="projects-form-group git-status-section">
@@ -232,6 +246,13 @@
         line-height: 1;
         color: var(--color-text);
         opacity: 0.7;
+    }
+
+    .projects-toggle-row {
+        display: flex;
+        gap: 1em;
+        align-items: center;
+        justify-content: space-between;
     }
 
     .projects-disabled {

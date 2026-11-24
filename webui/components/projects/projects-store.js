@@ -413,6 +413,7 @@ const model = {
       description: "",
       instructions: "",
       include_agents_md: true,
+      remote_access: false,
       color: "",
       git_url: "",
       git_token: "",
@@ -432,6 +433,7 @@ const model = {
       },
       ...projectData,
       include_agents_md: projectData.include_agents_md !== false,
+      remote_access: projectData.remote_access === true,
       llm: this._normalizeProjectLlmData(projectData.llm, name),
     };
   },

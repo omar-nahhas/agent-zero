@@ -104,6 +104,7 @@ class Settings(TypedDict):
     mcp_server_token: str
 
     a2a_server_enabled: bool
+    mcp_a2a_project_allowlist: bool
 
     variables: str
     secrets: str | None
@@ -649,6 +650,7 @@ def get_default_settings() -> Settings:
         mcp_server_enabled=get_default_value("mcp_server_enabled", False),
         mcp_server_token=create_auth_token(),
         a2a_server_enabled=get_default_value("a2a_server_enabled", False),
+        mcp_a2a_project_allowlist=get_default_value("mcp_a2a_project_allowlist", False),
         variables="",
         secrets="",
         litellm_global_kwargs=get_default_value("litellm_global_kwargs", {}),

@@ -103,14 +103,17 @@ class AgentZeroWorker(Worker):  # type: ignore[misc]
             # Convert A2A message to Agent Zero format
             agent_message = self._convert_message(message)
 
+            # Retrieve project from message.metadata (standard A2A pattern; the
+            # proxy sets it from the URL or the X-A0-Project header). With the
+            # project allowlist on, only a project reachable through A2A may run,
+            # checked before any context exists.
+            metadata = message.get('metadata', {}) or {}
+            project_name = server_auth.require_remote_access(metadata.get('project'))
+
             # Always create new temporary context for this A2A conversation
             cfg = initialize_agent()
             context = AgentContext(cfg, type=AgentContextType.BACKGROUND)
 
-            # Retrieve project from message.metadata (standard A2A pattern)
-            metadata = message.get('metadata', {}) or {}
-            project_name = metadata.get('project')
-         
             # Activate project if specified
             if project_name:
                 projects.activate_project(context.id, project_name)
@@ -526,9 +529,11 @@ class DynamicA2AProxy:
             else:
                 _PRINTER.print("[A2A] No expected token found in settings")
 
-        # Project from the URL (/p-{project}/) or the X-A0-Project header
+        # Project from the URL (/p-{project}/) or the X-A0-Project header; with the
+        # project allowlist on it must be reachable through A2A (no default fallback)
         try:
             project_name = server_auth.resolve_project(url_project, scope)
+            server_auth.require_remote_access(project_name)
         except server_auth.RequestRejected as e:
             await send({
                 'type': 'http.response.start',
